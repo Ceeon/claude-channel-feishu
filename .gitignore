@@ -1,0 +1,16 @@
+node_modules/
+.DS_Store
+bun.lock
+
+# Channel state (credentials, access control, inbox files)
+# These are runtime state, not part of the plugin code
+.env
+*.env.local
+access.json
+approved/
+inbox/
+
+# Claude Code project-specific files
+.claude/settings.json
+.claude/project.json
+.claude/tasks/
