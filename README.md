@@ -143,6 +143,59 @@ Access control mirrors the official Telegram plugin:
 
 Group chats require explicit opt-in via `/feishu:access group add <chat_id>`.
 
+## How Claude Code Channel Plugins Work
+
+Claude Code's official channel plugins (like Telegram) go through a strict 5-step registration chain:
+
+```
+marketplace.json → plugin.json → settings.json (enabledPlugins)
+→ installed_plugins.json → --channels flag → tengu_harbor_ledger (server-side allowlist)
+```
+
+All 5 steps must pass, or the plugin silently fails to load. The last step — `tengu_harbor_ledger` — is a **server-side allowlist** cached in `~/.claude.json` that Anthropic controls. Even if you manually inject your plugin into the official marketplace directory, Claude Code refreshes `marketplace.json` from GitHub on startup (overwriting your changes), and `tengu_harbor_ledger` is synced from Anthropic's servers (your plugin won't be on it).
+
+### What doesn't work
+
+| Approach | Result |
+|----------|--------|
+| `extraKnownMarketplaces` + `source: "directory"` | `${CLAUDE_PLUGIN_ROOT}` not resolved, MCP fails to start |
+| User-level MCP server (`claude mcp add --scope user`) | Server starts, but no `<channel>` notifications — it's an MCP server, not a channel plugin |
+| Project-level `.mcp.json` | Same — MCP tools work, but no channel capability |
+| Symlink into official marketplace | `marketplace.json` overwritten on startup; `tengu_harbor_ledger` blocks it |
+
+### What works: the three-flag approach
+
+For third-party channel plugins, the only working local development path combines three CLI flags:
+
+| Flag | What it does |
+|------|-------------|
+| `--mcp-config <path>` | Registers the MCP server (replaces marketplace + plugin.json + settings.json) |
+| `--dangerously-load-development-channels server:<name>` | Bypasses `tengu_harbor_ledger` allowlist, enables `<channel>` notifications |
+| `--plugin-dir <path>` | Loads skills from the plugin directory (e.g. `/feishu:access`) |
+
+The MCP server must declare the `claude/channel` experimental capability:
+
+```typescript
+capabilities: {
+  tools: {},
+  experimental: {
+    'claude/channel': {},
+    'claude/channel/permission': {},
+  },
+}
+```
+
+And push inbound messages as `notifications/claude/channel`:
+
+```typescript
+mcp.notification({
+  method: 'notifications/claude/channel',
+  params: { content: messageText, meta: { chat_id, message_id, user, ts } },
+})
+```
+
+See [.claude/log/01-插件注册机制.md](.claude/log/01-插件注册机制.md) for the full investigation with all failed attempts documented.
+
 ## Architecture
 
 ```
