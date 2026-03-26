@@ -37,7 +37,7 @@ Feishu (Lark) channel plugin for [Claude Code](https://docs.anthropic.com/en/doc
 ### 2. Clone and Install
 
 ```bash
-git clone https://github.com/chengfeng-git/claude-channel-feishu.git
+git clone https://github.com/Ceeon/claude-channel-feishu.git
 cd claude-channel-feishu
 bun install
 ```
