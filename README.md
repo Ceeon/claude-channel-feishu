@@ -222,6 +222,44 @@ See [.claude/log/02-飞书SDK踩坑.md](.claude/log/02-飞书SDK踩坑.md) for d
 - **No bot info API** — bot self-messages are filtered by `sender_type === 'app'` instead of `open_id` comparison.
 - **LoggerLevel casing** — SDK exports `lark.LoggerLevel.warn` (lowercase), not `WARN`.
 
+## Multiple Bots
+
+Each bot gets its own state directory with separate credentials and access control:
+
+```
+~/.claude/channels/feishu-work/      ← Bot A
+  ├── .env                            # FEISHU_APP_ID=cli_aaa
+  ├── mcp.json
+  └── access.json
+
+~/.claude/channels/feishu-personal/  ← Bot B
+  ├── .env                            # FEISHU_APP_ID=cli_bbb
+  ├── mcp.json
+  └── access.json
+```
+
+Each `mcp.json` must use a unique server name:
+
+```json
+{ "mcpServers": { "feishu-work": { "command": "bun", "args": ["run", "--cwd", "/path/to/plugin", "--shell=bun", "--silent", "start"] } } }
+```
+
+Then create separate aliases:
+
+```bash
+alias ccwork="FEISHU_STATE_DIR=~/.claude/channels/feishu-work claude \
+  --mcp-config ~/.claude/channels/feishu-work/mcp.json \
+  --dangerously-load-development-channels server:feishu-work \
+  --plugin-dir /path/to/claude-channel-feishu"
+
+alias ccme="FEISHU_STATE_DIR=~/.claude/channels/feishu-personal claude \
+  --mcp-config ~/.claude/channels/feishu-personal/mcp.json \
+  --dangerously-load-development-channels server:feishu-personal \
+  --plugin-dir /path/to/claude-channel-feishu"
+```
+
+The plugin code is shared — `FEISHU_STATE_DIR` determines which bot's credentials are used.
+
 ## Combining with Other Channels
 
 You can run Feishu alongside the official Telegram channel:
