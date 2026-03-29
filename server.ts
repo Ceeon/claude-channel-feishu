@@ -77,6 +77,10 @@ const client = new lark.Client({
 // Bot's own open_id — populated on first message, used to filter self-messages.
 let botOpenId = ''
 
+// Runtime map: chat_id → sender_id. Populated when inbound messages from
+// allowed senders arrive. Used by assertAllowedChat to verify reply targets.
+const knownChats = new Map<string, string>()
+
 // Permission-reply spec — same as Telegram plugin.
 const PERMISSION_REPLY_RE = /^\s*(y|yes|n|no)\s+([a-km-z]{5})\s*$/i
 
@@ -175,22 +179,13 @@ function pruneExpired(a: Access): boolean {
 
 function assertAllowedChat(chat_id: string): void {
   const access = loadAccess()
-  // Check if chat_id itself is in allowFrom (unlikely but handle it)
-  if (access.allowFrom.includes(chat_id)) return
   // Check group allowlist
   if (chat_id in access.groups) return
-  // For p2p chats: check if any allowed sender has this chat_id
-  // (approved files map sender_id → chat_id)
-  const approvedDir = join(STATE_DIR, 'approved')
-  try {
-    const files = readdirSync(approvedDir)
-    for (const senderId of files) {
-      if (access.allowFrom.includes(senderId)) {
-        const storedChat = readFileSync(join(approvedDir, senderId), 'utf-8').trim()
-        if (storedChat === chat_id) return
-      }
-    }
-  } catch {}
+  // Check runtime map (populated when inbound messages arrive from allowed senders)
+  const mappedSender = knownChats.get(chat_id)
+  if (mappedSender && access.allowFrom.includes(mappedSender)) return
+  // Fallback: check if chat_id itself is in allowFrom
+  if (access.allowFrom.includes(chat_id)) return
   throw new Error(`chat ${chat_id} is not allowlisted — add via /feishu:access`)
 }
 
@@ -505,9 +500,10 @@ mcp.setNotificationHandler(
       ],
     }
 
-    // Send to all allowlisted users. For Feishu we need to find their chat_id.
-    // In p2p chats, we can send using open_id with receive_id_type=open_id.
+    // Send to all allowlisted users. Only send to open_id (ou_ prefix);
+    // chat_ids (oc_) are not valid targets for receive_id_type=open_id.
     for (const userId of access.allowFrom) {
+      if (!userId.startsWith('ou_')) continue
       void client.im.message.create({
         params: { receive_id_type: 'open_id' },
         data: {
@@ -830,6 +826,9 @@ async function handleInbound(
     })
     return
   }
+
+  // Record chat→sender mapping so assertAllowedChat can verify reply targets
+  knownChats.set(chatId, senderId)
 
   // Parse message content
   const { text, imageKeys } = parseFeishuContent(msgType, content)
