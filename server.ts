@@ -20,7 +20,7 @@ import * as lark from '@larksuiteoapi/node-sdk'
 import { randomBytes } from 'crypto'
 import {
   readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync,
-  statSync, renameSync, realpathSync, chmodSync,
+  statSync, renameSync, realpathSync, chmodSync, existsSync, unlinkSync,
 } from 'fs'
 import { homedir } from 'os'
 import { join, extname, sep } from 'path'
@@ -34,8 +34,12 @@ const ENV_FILE = join(STATE_DIR, '.env')
 const INBOX_DIR = join(STATE_DIR, 'inbox')
 
 // Load ~/.claude/channels/feishu/.env into process.env. Real env wins.
+// Tightening permissions is best-effort only; some launch contexts cannot chmod
+// files outside the project sandbox, but credential loading still needs to work.
 try {
   chmodSync(ENV_FILE, 0o600)
+} catch {}
+try {
   for (const line of readFileSync(ENV_FILE, 'utf8').split('\n')) {
     const m = line.match(/^(\w+)=(.*)$/)
     if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2]
@@ -68,10 +72,34 @@ process.on('uncaughtException', err => {
 
 // ─── Feishu SDK clients ─────────────────────────────────────────────────────
 
+function formatSdkLogArg(arg: unknown): string {
+  if (typeof arg === 'string') return arg
+  try {
+    return JSON.stringify(arg)
+  } catch {
+    return String(arg)
+  }
+}
+
+function sdkLog(level: string, args: unknown[]): void {
+  const message = args.map(formatSdkLogArg).join(' ')
+  process.stderr.write(`feishu sdk [${level}]: ${message}\n`)
+}
+
+const sdkLogger = {
+  fatal: (...args: unknown[]) => sdkLog('fatal', args),
+  error: (...args: unknown[]) => sdkLog('error', args),
+  warn: (...args: unknown[]) => sdkLog('warn', args),
+  info: (...args: unknown[]) => sdkLog('info', args),
+  debug: (...args: unknown[]) => sdkLog('debug', args),
+  trace: (...args: unknown[]) => sdkLog('trace', args),
+}
+
 const client = new lark.Client({
   appId: APP_ID,
   appSecret: APP_SECRET,
   domain: DOMAIN,
+  logger: sdkLogger,
 })
 
 // Bot's own open_id — populated on first message, used to filter self-messages.
@@ -420,8 +448,10 @@ async function downloadImage(messageId: string, imageKey: string): Promise<strin
 
 // ─── MCP Server ─────────────────────────────────────────────────────────────
 
+const SERVER_NAME = process.env.MCP_SERVER_NAME ?? 'feishu'
+
 const mcp = new Server(
-  { name: 'feishu', version: '1.0.0' },
+  { name: SERVER_NAME, version: '1.0.0' },
   {
     capabilities: {
       tools: {},
@@ -990,7 +1020,10 @@ function handleCardAction(event: any): any {
 
 // ─── Start WebSocket connection ─────────────────────────────────────────────
 
-const eventDispatcher = new lark.EventDispatcher({}).register({
+const eventDispatcher = new lark.EventDispatcher({
+  logger: sdkLogger,
+  loggerLevel: lark.LoggerLevel.warn,
+}).register({
   'im.message.receive_v1': async (data: any) => {
     try {
       await handleInbound(data)
@@ -1017,6 +1050,7 @@ const wsClient = new lark.WSClient({
   appId: APP_ID,
   appSecret: APP_SECRET,
   domain: DOMAIN,
+  logger: sdkLogger,
   loggerLevel: lark.LoggerLevel.warn,
 })
 
@@ -1050,12 +1084,45 @@ void (async () => {
   } catch {}
 })()
 
+// ─── Singleton lock ─────────────────────────────────────────────────────────
+// Only one WebSocket connection per App ID is allowed. A second instance would
+// cause Feishu to distribute messages randomly, losing some of them.
+
+const LOCK_FILE = join(STATE_DIR, 'ws.lock')
+
+function acquireLock(): void {
+  if (existsSync(LOCK_FILE)) {
+    const raw = readFileSync(LOCK_FILE, 'utf8').trim()
+    const pid = Number(raw)
+    if (pid && pid !== process.pid) {
+      try {
+        process.kill(pid, 0)          // check if alive (signal 0 = no-op)
+        process.stderr.write(`feishu channel: killing old instance (pid ${pid})\n`)
+        process.kill(pid, 'SIGTERM')
+      } catch {
+        process.stderr.write(`feishu channel: removing stale lock (pid ${raw})\n`)
+      }
+    }
+  }
+  writeFileSync(LOCK_FILE, String(process.pid), 'utf8')
+}
+
+function releaseLock(): void {
+  try {
+    const raw = readFileSync(LOCK_FILE, 'utf8').trim()
+    if (Number(raw) === process.pid) unlinkSync(LOCK_FILE)
+  } catch {}
+}
+
+acquireLock()
+
 void wsClient.start({ eventDispatcher }).then(
   () => {
     process.stderr.write(`feishu channel: WebSocket connected\n`)
   },
   err => {
     process.stderr.write(`feishu channel: WebSocket connection failed: ${err}\n`)
+    releaseLock()
     process.exit(1)
   },
 )
@@ -1067,6 +1134,7 @@ function shutdown(): void {
   if (shuttingDown) return
   shuttingDown = true
   process.stderr.write('feishu channel: shutting down\n')
+  releaseLock()
   setTimeout(() => process.exit(0), 2000)
 }
 process.stdin.on('end', shutdown)
