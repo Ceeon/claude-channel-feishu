@@ -6,3 +6,6 @@
 | [02-飞书SDK踩坑.md](02-飞书SDK踩坑.md) | @larksuiteoapi/node-sdk 的 API 差异和 monkey-patch |
 | [03-开源发布.md](03-开源发布.md) | GitHub 开源发布的设计决策和文件清单 |
 | [04-权限卡片阻塞修复.md](04-权限卡片阻塞修复.md) | permission 卡片发送失败 + assertAllowedChat 依赖已删除文件，导致 channel 卡死 |
+| [05-多-bot-启动与配置隔离.md](05-多-bot-启动与配置隔离.md) | `ccf` / `ccqq` 的启动串扰、旧 schema 报错、多 bot 隔离原则 |
+
+注：当前运行时已改为开放入站，私聊不再 pairing，群聊默认以 @ 作为触发边界。

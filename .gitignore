@@ -14,3 +14,7 @@ inbox/
 .claude/settings.json
 .claude/project.json
 .claude/tasks/
+
+# Runtime debug logs and temp plugin clones (not source)
+.claude/log/[0-9]*-feishu/
+.claude/tmp-feishu-plugin/
