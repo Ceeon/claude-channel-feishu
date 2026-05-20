@@ -2,19 +2,10 @@
   "mcpServers": {
     "feishu": {
       "command": "bun",
-      "args": ["run", "--cwd", "/Users/chengfeng/Desktop/AIos/claude-channel-feishu", "--shell=bun", "--silent", "start"],
+      "args": ["run", "--cwd", "/absolute/path/to/claude-channel-feishu", "--shell=bun", "--silent", "start"],
       "env": {
-        "FEISHU_STATE_DIR": "/Users/chengfeng/.claude/channels/feishu",
+        "FEISHU_STATE_DIR": "/absolute/path/to/.claude/channels/feishu",
         "MCP_SERVER_NAME": "feishu"
-      },
-      "type": "stdio"
-    },
-    "feishuqq": {
-      "command": "bun",
-      "args": ["run", "--cwd", "/Users/chengfeng/Desktop/AIos/claude-channel-feishu", "--shell=bun", "--silent", "start"],
-      "env": {
-        "FEISHU_STATE_DIR": "/Users/chengfeng/.claude/channels/feishu-qq",
-        "MCP_SERVER_NAME": "feishuqq"
       },
       "type": "stdio"
     }

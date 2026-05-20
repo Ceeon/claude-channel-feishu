@@ -82,11 +82,11 @@ cat > ~/.claude/channels/feishu/mcp.json << EOF
 EOF
 ```
 
-> **Note** — the `.mcp.json` committed at the repo root is the author's own local
-> setup (channels `feishu` / `feishuqq`, used by the `ccf` / `ccqq` shell aliases,
-> with absolute paths under `/Users/chengfeng/...`). It is an **example, not a
-> template to reuse as-is**: configure your own paths and channel names following
-> the steps above. You don't need the root file to run the plugin.
+> **Note** — the `.mcp.json` at the repo root is a generic example with
+> placeholder paths (`/absolute/path/to/...`). Replace the paths with your own,
+> or just follow the steps above to create config under
+> `~/.claude/channels/<name>/mcp.json`. The root file isn't required to run the
+> plugin.
 
 ### 5. Launch Claude Code
 
