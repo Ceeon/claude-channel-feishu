@@ -146,7 +146,7 @@ The server exposes 4 tools to Claude Code:
 
 | Skill | Description |
 |-------|-------------|
-| `/feishu:access` | Manage routing config — group mention mode and legacy permission recipients |
+| `/feishu:access` | Manage routing config — group mention mode, permission-card recipients, and ack/UX settings |
 | `/feishu:configure` | Set up credentials, check status, view setup guide |
 
 ## Inbound Delivery
