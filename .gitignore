@@ -10,11 +10,8 @@ access.json
 approved/
 inbox/
 
-# Claude Code project-specific files
-.claude/settings.json
-.claude/project.json
-.claude/tasks/
+# Claude Code agent workspace — author's internal notes, not part of the plugin
+.claude/
 
-# Runtime debug logs and temp plugin clones (not source)
-.claude/log/[0-9]*-feishu/
-.claude/tmp-feishu-plugin/
+# Internal dev/investigation logs
+/log/

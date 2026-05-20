@@ -6,9 +6,6 @@ Feishu (Lark) channel plugin for [Claude Code](https://docs.anthropic.com/en/doc
 
 - [README.md](README.md) — installation, runtime model, multi-bot setup
 - [CLAUDE.md](CLAUDE.md) — agent navigation entry for this repository
-- [.claude/log/README.md](.claude/log/README.md) — human-readable investigation log index
-- [.claude/log/05-多-bot-启动与配置隔离.md](.claude/log/05-多-bot-启动与配置隔离.md) — recent `ccf` / `ccqq` startup and isolation investigation
-- [.claude/memory/01-多-bot-隔离原则.md](.claude/memory/01-多-bot-隔离原则.md) — durable rule for stable multi-bot setups
 
 ## Features
 
@@ -195,7 +192,8 @@ For third-party channel plugins, the only working local development path combine
 | `--dangerously-load-development-channels server:<name>` | Bypasses `tengu_harbor_ledger` allowlist, enables `<channel>` notifications |
 | `--plugin-dir <path>` | Loads skills from the plugin directory (e.g. `/feishu:access`) |
 
-The MCP server must declare the `claude/channel` experimental capability:
+The MCP server must declare the `claude/channel` experimental capability (every
+failed approach above was confirmed during development):
 
 ```typescript
 capabilities: {
@@ -215,8 +213,6 @@ mcp.notification({
   params: { content: messageText, meta: { chat_id, message_id, user, ts } },
 })
 ```
-
-See [.claude/log/01-插件注册机制.md](.claude/log/01-插件注册机制.md) for the full investigation with all failed attempts documented.
 
 ## Architecture
 
@@ -238,7 +234,7 @@ The server runs as an MCP server with `claude/channel` capability. It:
 
 ## Known Issues / SDK Quirks
 
-See [.claude/log/02-飞书SDK踩坑.md](.claude/log/02-飞书SDK踩坑.md) for detailed notes. Key issues:
+Key issues encountered with the Feishu SDK:
 
 - **WSClient silently drops card events** — the SDK's `handleEventData` only processes `type === "event"`, but card actions arrive as `type === "card"`. This plugin monkey-patches it.
 - **Bot-to-bot senders may use app IDs** — messages sent by another bot can arrive with `sender_type === "app"` and an app ID such as `cli_xxx`, not a user `open_id`. Inbound delivery does not check sender allowlists, so these ID differences do not block delivery.
@@ -323,8 +319,7 @@ When Claude's startup header says `server:feishu · no MCP server configured wit
 capture both the terminal header and the internal debug log before changing more config:
 
 ```bash
-scripts/trace-channel-startup.sh feishu
-scripts/trace-channel-startup.sh feishuqq
+scripts/trace-channel-startup.sh <server-name>   # e.g. feishu
 ```
 
 The script records:
